@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b0e14;
+  --surface: #131722;
+  --surface-2: #1a2030;
+  --surface-3: #202838;
+  --line: #2a3348;
+  --text: #eef1f6;
+  --muted: #9aa5b8;
+  --green: #26a69a;
+  --green-bright: #2ee6a8;
+  --red: #ef5350;
+  --yellow: #f5c518;
+  --blue: #2962ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0e14;
+    --surface: #131722;
+    --surface-2: #1a2030;
+    --line: #2a3348;
+    --text: #eef1f6;
+    --muted: #9aa5b8;
+  }
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", system-ui, -apple-system, sans-serif;
+}
+code, pre, .mono {
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #2a3348; border-radius: 99px; }
+input, select, textarea { font: inherit; }
+button { font: inherit; }
