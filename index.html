@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Robô Bullex - Corrigido</title><style>
+*{box-sizing:border-box}body{margin:0;background:#0b0e14;color:#fff;font-family:Arial,sans-serif}
+header{padding:14px 16px;background:#11151f;display:flex;justify-content:space-between;align-items:center}
+h1{font-size:18px;margin:0}h1 span{color:#00e676}.badge{background:#1e2a1e;color:#00e676;padding:6px 10px;border-radius:20px;font-size:12px}
+.top{display:flex;gap:8px;padding:10px;flex-wrap:wrap}.card{background:#141924;border-radius:12px;padding:12px;flex:1;min-width:140px}
+.card small{color:#9aa3b2}.price{font-size:28px;font-weight:900}.up{color:#00e676}.down{color:#ff5252}
+.tabs{display:flex;gap:8px;padding:0 10px}.tab{flex:1;padding:10px;border-radius:10px;border:0;background:#1a2130;color:#fff;font-weight:700;cursor:pointer}.tab.on{background:#00c853;color:#000}
+.tab.ok{border:2px solid #00e676}.tab.no{border:2px solid #333}
+#chart{height:320px;background:#0d1117;margin:10px;border-radius:12px;position:relative;overflow:hidden;border:1px solid #222}
+canvas{width:100%;height:100%;display:block}
+#signal{position:absolute;left:50%;top:14px;transform:translateX(-50%);padding:10px 16px;border-radius:20px;font-weight:900;z-index:5;background:#222;font-size:14px;text-align:center;max-width:92%}
+#signal.buy{background:#00e676;color:#000}#signal.sell{background:#ff5252;color:#fff}
+#info{margin:0 10px;padding:10px 12px;background:#141924;border-radius:10px;font-size:13px;line-height:1.5;color:#cbd5e1}
+#info b{color:#fff}.controls{display:flex;gap:8px;padding:10px}.controls button{flex:1;padding:13px;border:0;border-radius:10px;font-weight:900;cursor:pointer}
+.sync{background:#2962ff;color:#fff}.sound{background:#ffb300}.login{background:#00c853;color:#000}
+#loginBox{margin:10px;padding:14px;background:#141924;border-radius:12px}#loginBox input{width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#0b0e14;color:#fff;margin:6px 0}
+#hist{margin:10px;padding:12px;background:#141924;border-radius:12px;font-size:13px}#hist div{padding:6px 0;border-bottom:1px solid #222}
+footer{padding:12px;text-align:center;color:#8892a2;font-size:12px}
+</style></head><body>
+<header><h1>ROBÔ <span>BULLEX</span> • EUR/USD OTC</h1><div class="badge">● AO VIVO • CORRIGIDO</div></header>
+<div class="top">
+<div class="card"><small>PREÇO ATUAL</small><div class="price" id="price">1,0977</div><small>Base: <b style="color:#fff">1,0977</b> • <span id="variacao">Sincronizado</span></small></div>
+<div class="card"><small>CONFLUÊNCIAS</small><div class="price" id="conf">0 / 3</div><small id="confDetail">Aguardando...</small></div>
+<div class="card"><small>ÚLTIMO SINAL • PRÓXIMA VELA EM</small><div class="price" id="last">—</div><small id="lastTime">— • <b id="timer" style="color:#ffca28">60s</b></small></div>
+</div>
+<div class="tabs">
+<button class="tab on" id="tMA" onclick="setTab('MA')">MA 5x21 <span id="sMA">•</span></button>
+<button class="tab" id="tDP" onclick="setTab('DPVAT')">DPVAT / PIVÔ <span id="sDP">•</span></button>
+<button class="tab" id="tRSI" onclick="setTab('RSI')">RSI <span id="sRSI">•</span></button>
+</div>
+<div id="chart"><canvas id="c"></canvas><div id="signal">AGUARDANDO 3 CONFLUÊNCIAS</div></div>
+<div id="info">Clique numa aba acima para ver o detalhe dela aqui — <b>sem popup</b>. O sinal só aparece quando as 3 apontam para o <b>mesmo lado</b>.</div>
+<div class="controls"><button class="sync" onclick="sincronizar()">⟳ SINCRONIZAR</button><button class="sound" id="btnSom" onclick="toggleSom()">🔊 SOM: LIGADO</button></div>
+<div id="hist"><b>📋 HISTÓRICO DE SINAIS</b><div id="histList">Nenhum sinal ainda...</div></div>
+<div id="loginBox"><b>🔐 Acesso do cliente</b><input id="user" placeholder="Login"><input id="pass" type="password" placeholder="Senha"><button class="login" style="width:100%;padding:13px;border:0;border-radius:10px;font-weight:900" onclick="entrar()">ENTRAR</button><p id="msg" style="font-size:13px;color:#9aa3b2">Acesso liberado após compra. Sem teste grátis.</p></div>
+<footer>Robô Bullex • Sinal só com 3 confluências no mesmo lado • COMPRA e VENDA</footer>
+<script>
+let base=1.0977, price=base, pts=[]; for(let i=0;i<90;i++){price+=(Math.random()-.5)*0.0006; pts.push(price)} price=base;
+let som=true, cooldown=0, timer=60, tab='MA', lastDir='';
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+function resize(){cv.width=cv.clientWidth;cv.height=cv.clientHeight} resize(); addEventListener('resize',resize);
+function ma(n){let s=pts.slice(-n); return s.reduce((a,b)=>a+b,0)/s.length}
+function rsi(){let g=0,l=0; for(let i=Math.max(1,pts.length-14);i<pts.length;i++){let d=pts[i]-pts[i-1]; if(d>0)g+=d; else l-=d} let rs=g/(l||0.0001); return 100-(100/(1+rs))}
+function beep(f){if(!som)return; try{let a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=f;o.connect(g);g.connect(a.destination);g.gain.value=.12;o.start();o.stop(a.currentTime+.35)}catch(e){}}
+function draw(){
+ ctx.clearRect(0,0,cv.width,cv.height); ctx.strokeStyle='#1e2a3a';
+ for(let y=0;y<cv.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cv.width,y);ctx.stroke()}
+ // linha base 1.0977
+ let mn=Math.min(...pts), mx=Math.max(...pts); let yBase=cv.height-((base-mn)/(mx-mn||1))*(cv.height-30)-10;
+ ctx.setLineDash([6,6]); ctx.strokeStyle='#ffca28'; ctx.beginPath(); ctx.moveTo(0,yBase); ctx.lineTo(cv.width,yBase); ctx.stroke(); ctx.setLineDash([]);
+ ctx.fillStyle='#ffca28'; ctx.font='11px Arial'; ctx.fillText('BASE 1,0977',8,yBase-6);
+ let line=(arr,color,w)=>{ctx.beginPath(); arr.forEach((p,i)=>{let x=i/(arr.length-1)*cv.width, y=cv.height-((p-mn)/(mx-mn||1))*(cv.height-30)-10; i?ctx.lineTo(x,y):ctx.moveTo(x,y)}); ctx.strokeStyle=color; ctx.lineWidth=w; ctx.stroke()};
+ line(pts,'#00e676',2.5);
+ // MA5 amarela, MA21 azul
+ let m5=pts.map((_,i)=>{let s=pts.slice(Math.max(0,i-4),i+1); return s.reduce((a,b)=>a+b,0)/s.length});
+ let m21=pts.map((_,i)=>{let s=pts.slice(Math.max(0,i-20),i+1); return s.reduce((a,b)=>a+b,0)/s.length});
+ line(m5,'#ffca28',1.4); line(m21,'#40a0ff',1.4);
+ // seta no último ponto
+ let lx=cv.width-14, ly=cv.height-((price-mn)/(mx-mn||1))*(cv.height-30)-10;
+ ctx.fillStyle=price>=base?'#00e676':'#ff5252'; ctx.beginPath(); ctx.arc(lx,ly,7,0,7); ctx.fill();
+}
+function setTab(t){tab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on')); document.getElementById(t=='MA'?'tMA':t=='DPVAT'?'tDP':'tRSI').classList.add('on'); updateInfo()}
+function updateInfo(){
+ let m5=ma(5), m21=ma(21), r=rsi();
+ let dirMA=m5>m21?'COMPRA':m5<m21?'VENDA':'NEUTRO';
+ let dirDP=price>base+0.0003?'COMPRA':price<base-0.0003?'VENDA':'NEUTRO';
+ let dirRSI=r>52?'COMPRA':r<48?'VENDA':'NEUTRO';
+ let txt={MA:`<b>MA 5x21:</b> MA5 ${m5.toFixed(4)} x MA21 ${m21.toFixed(4)} → <b>${dirMA}</b>. Cruzamento pra cima = compra, pra baixo = venda.`,
+ DPVAT:`<b>DPVAT / PIVÔ:</b> Preço ${price.toFixed(4)} vs Base ${base.toFixed(4)} → <b>${dirDP}</b>. Rompeu pra cima = compra, pra baixo = venda.`,
+ RSI:`<b>RSI (14):</b> ${r.toFixed(1)} → <b>${dirRSI}</b>. Acima de 52 = força de compra, abaixo de 48 = força de venda.`}[tab];
+ document.getElementById('info').innerHTML=txt+`<br><small>Regra: sinal só sai se MA + DPVAT + RSI apontarem pro MESMO lado.</small>`;
+ document.getElementById('sMA').textContent=dirMA=='COMPRA'?'▲':dirMA=='VENDA'?'▼':'•';
+ document.getElementById('sDP').textContent=dirDP=='COMPRA'?'▲':dirDP=='VENDA'?'▼':'•';
+ document.getElementById('sRSI').textContent=dirRSI=='COMPRA'?'▲':dirRSI=='VENDA'?'▼':'•';
+ document.getElementById('tMA').className='tab'+(tab=='MA'?' on':'')+(dirMA!='NEUTRO'?' ok':' no');
+ document.getElementById('tDP').className='tab'+(tab=='DPVAT'?' on':'')+(dirDP!='NEUTRO'?' ok':' no');
+ document.getElementById('tRSI').className='tab'+(tab=='RSI'?' on':'')+(dirRSI!='NEUTRO'?' ok':' no');
+ return {dirMA,dirDP,dirRSI,r};
+}
+function addHist(dir){
+ let el=document.getElementById('histList'); if(el.textContent.includes('Nenhum')) el.innerHTML='';
+ let d=document.createElement('div'); d.textContent=`${new Date().toLocaleTimeString('pt-BR')} • ${dir} • EUR/USD OTC • ${price.toFixed(4)}`; d.style.color=dir.includes('COMPRA')?'#00e676':'#ff5252'; el.prepend(d);
+}
+function tick(){
+ // movimento que oscila e volta pra base - assim dá compra E venda
+ let pull=(base-price)*0.08; price += pull + (Math.random()-.5)*0.0007;
+ pts.push(price); if(pts.length>90) pts.shift();
+ let {dirMA,dirDP,dirRSI,r}=updateInfo();
+ let buy=dirMA=='COMPRA'&&dirDP=='COMPRA'&&dirRSI=='COMPRA';
+ let sell=dirMA=='VENDA'&&dirDP=='VENDA'&&dirRSI=='VENDA';
+ let n=(dirMA!='NEUTRO'?1:0)+(dirDP!='NEUTRO'?1:0)+(dirRSI!='NEUTRO'?1:0);
+ document.getElementById('price').textContent=price.toFixed(4).replace('.',',');
+ document.getElementById('price').className='price '+(price>=base?'up':'down');
+ document.getElementById('conf').textContent=n+' / 3';
+ document.getElementById('confDetail').textContent=`MA:${dirMA} • DPVAT:${dirDP} • RSI:${r.toFixed(0)} ${dirRSI}`;
+ let s=document.getElementById('signal'); if(cooldown>0) cooldown--;
+ if((buy||sell)&&cooldown<=0){
+   let dir=buy?'COMPRA ▲':'VENDA ▼'; lastDir=dir; cooldown=15;
+   s.textContent='✅ SINAL: '+dir+' • EUR/USD OTC • '+price.toFixed(4); s.className=buy?'buy':'sell'; s.id='signal';
+   document.getElementById('last').textContent=dir; document.getElementById('lastTime').innerHTML=new Date().toLocaleTimeString('pt-BR')+' • <b id="timer">'+timer+'s</b>';
+   beep(buy?880:520); addHist(dir);
+ } else if(!buy&&!sell){ s.textContent=`AGUARDANDO 3 NO MESMO LADO • ${n}/3`; s.className=''; s.id='signal'; }
+ draw();
+}
+setInterval(tick,900); setInterval(()=>{timer--; if(timer<=0)timer=60; let t=document.getElementById('timer'); if(t)t.textContent=timer+'s'},1000);
+function sincronizar(){price=base; document.getElementById('variacao').textContent='Sincronizado agora • '+new Date().toLocaleTimeString('pt-BR'); beep(1000)}
+function toggleSom(){som=!som; document.getElementById('btnSom').textContent=som?'🔊 SOM: LIGADO':'🔇 SOM: DESLIGADO'}
+function entrar(){document.getElementById('msg').textContent='Login recebido: '+document.getElementById('user').value+' — valide o acesso pago para liberar os sinais.'}
+updateInfo(); draw();
+</script></body></html>
